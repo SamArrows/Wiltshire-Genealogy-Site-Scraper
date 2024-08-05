@@ -81,7 +81,7 @@ def instantiate_threads(thread_count: int = 4, total_pages: int = 79, target_fun
     if pages_per_thread != total_pages / thread_count:
         for i in range(0, thread_count-1):
             threads.append(WebScrapeThread(i*pages_per_thread+1, pages_per_thread, target_function, *args_for_target))
-        pages_remaining = 79 - (thread_count-1) * pages_per_thread
+        pages_remaining = total_pages - (thread_count-1) * pages_per_thread
         threads.append(WebScrapeThread((thread_count-1)*pages_per_thread+1, pages_remaining, target_function, *args_for_target))
     else:
         for i in range(0, thread_count):
