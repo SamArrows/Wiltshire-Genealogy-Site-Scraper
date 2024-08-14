@@ -11,6 +11,7 @@ Currently, it is effectively able to utilise threading to count all instances of
 import requests
 from bs4 import BeautifulSoup
 import threading
+import matplotlib.pyplot as plt
 
 session = requests.Session() # Create a session object
 adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10)   # Configure connection pool size
@@ -81,7 +82,7 @@ def instantiate_threads(thread_count: int = 4, total_pages: int = 79, target_fun
     if pages_per_thread != total_pages / thread_count:
         for i in range(0, thread_count-1):
             threads.append(WebScrapeThread(i*pages_per_thread+1, pages_per_thread, target_function, *args_for_target))
-        pages_remaining = total_pages - (thread_count-1) * pages_per_thread
+        pages_remaining = 79 - (thread_count-1) * pages_per_thread
         threads.append(WebScrapeThread((thread_count-1)*pages_per_thread+1, pages_remaining, target_function, *args_for_target))
     else:
         for i in range(0, thread_count):
@@ -130,5 +131,98 @@ complete_dictionary = {}
 for i in range(0, len(dics)):
     complete_dictionary = combine_dicts(complete_dictionary, dics[i])
 
-for key, value in complete_dictionary.items():
-    print(f"{key}: {value}")
+#for key, value in complete_dictionary.items():
+#    print(f"{key}: {value}")
+
+def sort_dict_by_values_desc(data):
+    """
+    Sorts a dictionary by its values in descending order.
+    Parameters are the dictionary to sort, returns a new dictionary sorted by values from highest to lowest.
+    """
+    return dict(sorted(data.items(), key=lambda item: item[1], reverse=True))
+
+def sort_dict_by_values_asc(data):
+    """
+    Sorts a dictionary by its values in ascending order.
+    Parameters are the dictionary to sort, returns a new dictionary sorted by values from lowest to highest.
+    """
+    return dict(sorted(data.items(), key=lambda item: item[1], reverse=False))
+
+def sort_dict_alphabetically(data):
+    """
+    Sorts a dictionary by its keys in alphabetical order.
+    """
+    return dict(sorted(data.items()))
+
+def filter_dict(data, *conditions):
+    """
+    Filters the dictionary based on provided conditions.
+    Parameters:
+    - data: Dictionary to be filtered.
+    - conditions: Functions that take a key-value pair and return True if it should be included.
+    Returns: A new filtered dictionary.
+    """
+    filtered_data = {}
+    for key, value in data.items():
+        if all(condition(key, value) for condition in conditions):
+            filtered_data[key] = value
+    return filtered_data
+
+def condition_greater_than_threshold(key, value, threshold=10):
+    return value > threshold # can also be written as ===> lambda k, v: v >= 100
+
+def condition_starts_with_letter(key, value, letter='J'):
+    return key.upper().startswith(letter.upper())
+
+def condition_starts_with_one_of_letter(key, value, letters=['X', 'Y', 'Z']):
+    return key.upper()[0] in letters
+
+def condition_name_length_greater_than_threshold(key, value, threshold=10):
+    return len(key) > threshold
+
+def condition_filter_out_specific_names(key, value, names=['(?)']):
+    return key not in names # allows you to filter out specific patterns, which is useful for old records if a first name isn't actually provided
+
+def trim_sorted_dictionary(dic, top_n_percent=0.1):
+    '''
+    Assuming a dictionary is sorted by value or name occurrence, we can take the first n occurences
+    - example - take the top 10% names based on usage
+    - top_n_percent should be written as decimal --> 0.1 = 10%
+    '''
+    n = round(len(dic) * top_n_percent)
+    return dict(list(dic.items())[:n])
+
+data = trim_sorted_dictionary(filter_dict(sort_dict_by_values_desc(complete_dictionary), condition_filter_out_specific_names))
+# data = filter_dict(sort_dict_by_values_asc(complete_dictionary), condition_starts_with_one_of_letter)
+# any of the conditions can be applied in the filter_dict function to customize the plot
+
+keys = list(data.keys())
+values = list(data.values())
+
+plt.bar(keys, values, color='purple')
+
+# Set default font sizes
+plt.rcParams['font.size'] = 14               # Default font size for all text
+plt.rcParams['axes.titlesize'] = 16          # Size for axes titles
+plt.rcParams['axes.labelsize'] = 14          # Size for axes labels
+plt.rcParams['xtick.labelsize'] = 12         # Size for x-tick labels
+plt.rcParams['ytick.labelsize'] = 12         # Size for y-tick labels
+
+plt.title('First Names recorded at birth in Stourton, Mere, Kilmington and Wiltshire 17-19th Centuries')
+
+# Add exact numbers above the bars
+for i, value in enumerate(values):
+    plt.text(i, 
+            value + 0.5, 
+            str(value), 
+            ha='center', 
+            va='bottom',
+            rotation=45,  
+            fontsize=8)
+
+plt.xlabel('Names')
+plt.ylabel('Total')
+plt.xticks(rotation=90)
+#plt.grid(True)
+
+plt.show()
