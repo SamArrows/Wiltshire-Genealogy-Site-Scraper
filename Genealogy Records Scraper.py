@@ -32,6 +32,20 @@ def sort_dict_by_values_asc(data):
     """
     return dict(sorted(data.items(), key=lambda item: item[1], reverse=False))
 
+def sort_dict_by_keys_desc(data):
+    """
+    Sorts a dictionary by its keys in descending order.
+    Parameters are the dictionary to sort, returns a new dictionary sorted by keys from highest to lowest.
+    """
+    return dict(sorted(data.items(), key=lambda item: item[0], reverse=True))
+
+def sort_dict_by_keys_asc(data):
+    """
+    Sorts a dictionary by its keys in ascending order.
+    Parameters are the dictionary to sort, returns a new dictionary sorted by keys from lowest to highest.
+    """
+    return dict(sorted(data.items(), key=lambda item: item[0], reverse=False))
+
 def sort_dict_alphabetically(data):
     """
     Sorts a dictionary by its keys in alphabetical order.
@@ -154,6 +168,10 @@ def get_firstnames_with_birthyear(page: BeautifulSoup, exclude_middle_names: boo
             if 'b.' in clean_entry: # Split the entry to separate name from birth year
                 name_year = clean_entry.split('b.')
                 name = name_year[0].strip()
+
+                if exclude_middle_names:
+                    name = name.split(" ")[0]
+
                 birth_info = name_year[1].strip().split(',')[0]  # Get only the birth year part
                 birth_year = birth_info.strip()
                 if format_circa:
@@ -210,7 +228,7 @@ class WebScrapeThread(threading.Thread):
 #print(get_firstnames_with_birthyear(get_surname_index_page(22), False, True))
 
 name_dict = {}
-threads = instantiate_threads(4, 79, get_firstnames_with_birthyear, False, True)    # call this function to instantiate dictionary with years as the keys and lists of names as values
+threads = instantiate_threads(4, 79, get_firstnames_with_birthyear, True, True)    # call this function to instantiate dictionary with years as the keys and lists of names as values
 #threads = instantiate_threads(4, 79, get_firstnames, True, True)   # call this function to instantiate dictionary with names as keys and occurrences represented as integers for values
 
 for thread in threads:
@@ -233,9 +251,111 @@ for i in range(0, len(dics)):
 #    print(f"{key}: {value}")
 
 data = complete_dictionary
-print(data)
 
-def format_plot_for_getFirstNames():
+def merge_years_into_decade(dict_to_recomp: dict):
+    '''
+    For a dictionary where the keys are birth years as integers, this function will merge key-value pairs which sit within the same decade
+    - returns a dictionary where the key is the year and the value is the list of names born in that year
+    '''
+    new_dict = {}
+    for key, value in dict_to_recomp.items():
+        decade = int(key/10) * 10
+        if decade in new_dict:
+            for name in value:
+                new_dict[decade].append(name)
+        else:
+            new_dict[decade] = value
+    return new_dict
+
+def recomp_dict(dict_to_recomp: dict):
+    '''
+    input: dictionary where key is a year or decade as int and the value is a list of names
+    returns:
+    - key is the year/decade as a number
+    - the value is another dictionary mapping names from that year to their respective number of occurences ==> same structure as the output from get_firstnames
+    '''
+    new_dict = {}
+    for key, value in dict_to_recomp.items():
+        if key in new_dict:
+            for name in value:
+                if name in new_dict[key]:
+                    new_dict[key] += 1
+                else:
+                    new_dict[key] = 0
+        else:
+            value_dict = {}
+            for name in value:
+                if name in value_dict:
+                    value_dict[name] += 1
+                else:
+                    value_dict[name] = 1
+            new_dict[key] = value_dict
+    return new_dict
+
+data = recomp_dict(merge_years_into_decade(data))
+
+for key, value in data.items():
+    print(key, ": ", value, "\n")
+
+def format_plot_for_getFirstNamesWithBirthYearAsInt(data: dict):
+    '''
+    Call this function if your dictionary was created using the function get_firstnames_with_birthyear
+    where the birthyear was inserted as an integer --> i.e. years with circa or a full birth day must be formatted to a single year
+    - dictionary should be of the form key : val ==> int : List[string]
+        where the key is a year and the val is the list of names in that year
+
+    Aim of plot is to have decades on the x-axis in chronological order, number of name occurrences on the y-axis; three bars will be allocated on each decade, representing the 
+        top three most common given first names in that decade, with the names written at the top of the bars
+
+    = First, we need to sort the dictionary by keys from lowest to highest for the years/decades to be in chronological order
+    = Next, we need to sort the values' dictionaries from highest to lowest by values - these dictionaries have names for keys and number of uses for values
+    = We then need to label on the x-axis: the keys representing decades; the y-axis: number of occurrences for names; and the bars: most common names each decade
+    '''
+    chronological = sort_dict_by_keys_desc(data)
+    decades = list(chronological.keys())
+    top_names = []
+    respective_counts = []
+    for key, name_dict in chronological.items():
+        # now we need to get the values sorted by value in descending order
+        name_dict_sorted = sort_dict_by_values_desc(name_dict)
+        top_names.append(list(name_dict_sorted.keys())[0])
+        respective_counts.append(list(name_dict_sorted.values())[0])
+
+    # plot just the top name for now, add functionality for choosing top three or five or however many later on
+    bar_width = 3
+    plt.bar(decades, respective_counts, color='purple', width=bar_width)
+
+    # Set default font sizes
+    plt.rcParams['font.size'] = 14               # Default font size for all text
+    plt.rcParams['axes.titlesize'] = 16          # Size for axes titles
+    plt.rcParams['axes.labelsize'] = 14          # Size for axes labels
+    plt.rcParams['xtick.labelsize'] = 12         # Size for x-tick labels
+    plt.rcParams['ytick.labelsize'] = 12         # Size for y-tick labels
+
+    plt.title('Most popular first names recorded at birth per decade in Stourton, Mere, Kilmington and Wiltshire 17-19th Centuries')
+
+    # Add names above the bars - still needs fixing, no text is showing whatsoever
+    for i, value in enumerate(respective_counts):
+        print(f"Index: {i}, Value: {value}, Name: {top_names[i]}")  # Debugging line
+        plt.text(i, 
+                value + 1, 
+                str(value), 
+                ha='center', 
+                va='bottom',
+                rotation=0,  
+                fontsize=14)
+
+    plt.xlabel('Decade')
+    plt.ylabel('Total occurrences of most popular name')
+    plt.xticks(rotation=90)
+    plt.ylim(0, max(respective_counts) + 5)
+    #plt.grid(True)
+
+    plt.show()
+
+format_plot_for_getFirstNamesWithBirthYearAsInt(data)
+
+def format_plot_for_getFirstNames(data: dict):
     '''
     Call this function if your dictionary was created using the function get_firstnames
     - dictionary should be of the form key : val ==> string : int
