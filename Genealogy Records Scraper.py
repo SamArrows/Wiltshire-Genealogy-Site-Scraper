@@ -294,10 +294,11 @@ def recomp_dict(dict_to_recomp: dict):
 
 data = recomp_dict(merge_years_into_decade(data))
 
-for key, value in data.items():
-    print(key, ": ", value, "\n")
+#for key, value in data.items():
+#    print(key, ": ", value, "\n")
 
-def format_plot_for_getFirstNamesWithBirthYearAsInt(data: dict):
+
+def format_plot_for_getFirstNamesWithBirthYearAsInt(data: dict, number_of_names_to_plot: int = 1):
     '''
     Call this function if your dictionary was created using the function get_firstnames_with_birthyear
     where the birthyear was inserted as an integer --> i.e. years with circa or a full birth day must be formatted to a single year
@@ -310,45 +311,58 @@ def format_plot_for_getFirstNamesWithBirthYearAsInt(data: dict):
     = First, we need to sort the dictionary by keys from lowest to highest for the years/decades to be in chronological order
     = Next, we need to sort the values' dictionaries from highest to lowest by values - these dictionaries have names for keys and number of uses for values
     = We then need to label on the x-axis: the keys representing decades; the y-axis: number of occurrences for names; and the bars: most common names each decade
+
+    STILL NEED TO ADD FUNCTIONALITY TO PLOT A NUMBER OF TOP POPULAR NAMES, I.E. TOP TWO, THREE, FOUR ETC.
     '''
-    chronological = sort_dict_by_keys_desc(data)
-    decades = list(chronological.keys())
-    top_names = []
-    respective_counts = []
-    for key, name_dict in chronological.items():
-        # now we need to get the values sorted by value in descending order
-        name_dict_sorted = sort_dict_by_values_desc(name_dict)
-        top_names.append(list(name_dict_sorted.keys())[0])
-        respective_counts.append(list(name_dict_sorted.values())[0])
-
-    # plot just the top name for now, add functionality for choosing top three or five or however many later on
-    bar_width = 3
-    plt.bar(decades, respective_counts, color='purple', width=bar_width)
-
     # Set default font sizes
     plt.rcParams['font.size'] = 14               # Default font size for all text
     plt.rcParams['axes.titlesize'] = 16          # Size for axes titles
     plt.rcParams['axes.labelsize'] = 14          # Size for axes labels
     plt.rcParams['xtick.labelsize'] = 12         # Size for x-tick labels
     plt.rcParams['ytick.labelsize'] = 12         # Size for y-tick labels
-
     plt.title('Most popular first names recorded at birth per decade in Stourton, Mere, Kilmington and Wiltshire 17-19th Centuries')
 
-    # Add names above the bars - still needs fixing, no text is showing whatsoever
-    for i, value in enumerate(respective_counts):
-        print(f"Index: {i}, Value: {value}, Name: {top_names[i]}")  # Debugging line
-        plt.text(i, 
-                value + 1, 
-                str(value), 
-                ha='center', 
-                va='bottom',
-                rotation=0,  
-                fontsize=14)
+    chronological = sort_dict_by_keys_desc(data)
+    decades = list(chronological.keys())
+    top_names = []
+    respective_counts = []     
+    for key, name_dict in chronological.items():
+        max_val = max(name_dict.values())
+        top_names.append(f"{', '.join(name for name, count in name_dict.items() if count == max_val)}")
+        respective_counts.append(max_val)
+    '''
+    OLD METHOD, SEE ABOVE FOR NEW METHOD
+    for key, name_dict in chronological.items():
+        # now we need to get the values sorted by value in descending order
+        name_dict_sorted = sort_dict_by_values_desc(name_dict)
+        top_names.append(list(name_dict_sorted.keys())[0])
+        respective_counts.append(list(name_dict_sorted.values())[0])   
+        # these lines can be used to double check extracted values for debugging purposes -> i.e. seeing what happens if two names have the same count
+        #top_name = list(name_dict_sorted.keys())[0]
+        #top_names.append(top_name)
+        #count = list(name_dict_sorted.values())[0]
+        #respective_counts.append(count)
+        #print(f"{name_dict_sorted} \n{top_name} \n{count}\n\n")
+    '''
+    
+    # plot just the top name for now, add functionality for choosing top three or five or however many later on
+    bar_width = 3
+    bars = plt.bar(decades, respective_counts, color='purple', width=bar_width)
+
+    for i in range(0,len(bars)):
+        height = bars[i].get_height()
+        plt.annotate(f'{top_names[i]}\n{height}',
+                    xy=(bars[i].get_x() + bars[i].get_width() / 2, height),
+                    xytext=(0, 1),  # 3 points vertical offset
+                    textcoords="offset points",
+                    ha='center', va='bottom',
+                    rotation=90,
+                    fontsize=8)
 
     plt.xlabel('Decade')
     plt.ylabel('Total occurrences of most popular name')
     plt.xticks(rotation=90)
-    plt.ylim(0, max(respective_counts) + 5)
+    #plt.ylim(0, max(respective_counts) + 5)
     #plt.grid(True)
 
     plt.show()
