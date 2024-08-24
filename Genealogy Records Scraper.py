@@ -7,9 +7,11 @@ Currently, it is effectively able to utilise threading to count all instances of
 
 
 '''
+from bs4 import BeautifulSoup
+from dictionary_funcs import *
+from namesnlp import *
 import re
 import requests
-from bs4 import BeautifulSoup
 import threading
 import matplotlib.pyplot as plt
 
@@ -17,97 +19,6 @@ session = requests.Session() # Create a session object
 adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10)   # Configure connection pool size
 session.mount('http://', adapter)
 session.mount('https://', adapter)
-
-def sort_dict_by_values_desc(data):
-    """
-    Sorts a dictionary by its values in descending order.
-    Parameters are the dictionary to sort, returns a new dictionary sorted by values from highest to lowest.
-    """
-    return dict(sorted(data.items(), key=lambda item: item[1], reverse=True))
-
-def sort_dict_by_values_asc(data):
-    """
-    Sorts a dictionary by its values in ascending order.
-    Parameters are the dictionary to sort, returns a new dictionary sorted by values from lowest to highest.
-    """
-    return dict(sorted(data.items(), key=lambda item: item[1], reverse=False))
-
-def sort_dict_by_keys_desc(data):
-    """
-    Sorts a dictionary by its keys in descending order.
-    Parameters are the dictionary to sort, returns a new dictionary sorted by keys from highest to lowest.
-    """
-    return dict(sorted(data.items(), key=lambda item: item[0], reverse=True))
-
-def sort_dict_by_keys_asc(data):
-    """
-    Sorts a dictionary by its keys in ascending order.
-    Parameters are the dictionary to sort, returns a new dictionary sorted by keys from lowest to highest.
-    """
-    return dict(sorted(data.items(), key=lambda item: item[0], reverse=False))
-
-def sort_dict_alphabetically(data):
-    """
-    Sorts a dictionary by its keys in alphabetical order.
-    """
-    return dict(sorted(data.items()))
-
-def filter_dict(data, *conditions):
-    """
-    Filters the dictionary based on provided conditions.
-    Parameters:
-    - data: Dictionary to be filtered.
-    - conditions: Functions that take a key-value pair and return True if it should be included.
-    Returns: A new filtered dictionary.
-    """
-    filtered_data = {}
-    for key, value in data.items():
-        if all(condition(key, value) for condition in conditions):
-            filtered_data[key] = value
-    return filtered_data
-
-def condition_greater_than_threshold(key, value, threshold=10):
-    return value > threshold # can also be written as ===> lambda k, v: v >= 100
-
-def condition_starts_with_letter(key, value, letter='J'):
-    return key.upper().startswith(letter.upper())
-
-def condition_starts_with_one_of_letter(key, value, letters=['X', 'Y', 'Z']):
-    return key.upper()[0] in letters
-
-def condition_name_length_greater_than_threshold(key, value, threshold=10):
-    return len(key) > threshold
-
-def condition_filter_out_specific_names(key, value, names=['(?)']):
-    return key not in names # allows you to filter out specific patterns, which is useful for old records if a first name isn't actually provided
-
-def trim_sorted_dictionary(dic, top_n_percent=0.1):
-    '''
-    Assuming a dictionary is sorted by value or name occurrence, we can take the first n occurences
-    - example - take the top 10% names based on usage
-    - top_n_percent should be written as decimal --> 0.1 = 10%
-    '''
-    n = round(len(dic) * top_n_percent)
-    return dict(list(dic.items())[:n])
-
-def combine_dicts(dict1: dict, dict2: dict):
-    '''
-    Combines two dictionaries by summing the counts of their common keys while simply concatenating key-value pairs which are unique to each other
-    EXAMPLE:
-        DICT1 = {'a': 3, 'b': 5, 'c' : 7 }
-        DICT2 = {'b' : 1, 'c': 3, 'd': 3}
-        combine_dicts(DICT1, DICT2) = {'a': 3, 'b': 6, 'c': 10, 'd': 3}
-    '''
-    new_dict = {}
-    for key, value in dict1.items():
-        if key in dict2:
-            new_dict[key] = value + dict2[key]
-        else:
-            new_dict[key] = value
-    for key, value in dict2.items():
-        if key not in dict1:
-            new_dict[key] = value
-    return new_dict
 
 def get_surname_index_page(index: int):
     try:
@@ -185,6 +96,31 @@ def get_firstnames_with_birthyear(page: BeautifulSoup, exclude_middle_names: boo
                     dict_to_insert_into[birth_year] = [name]
     return dict_to_insert_into
 
+def find_variations_in_name(name: str, all_names: List[str], distance_threshold: float = 0.75, store_as_dict: bool = False):
+    '''
+    Provided a list of names, this function will find all the variations in the name using a distance metric (Jaro-Winkler)
+    and either return a list of variations of the name (i.e. names with a distance above the threshold) or a dictionary where
+    the keys are the names and the values are the distances.
+
+    If you want to apply operations to the names before finding variations, such as stemming, you can apply that to the list of names
+    separately, then turn the list into a set and back into a list.
+
+    Inputs:
+    - name (str) ==> the name you want to find variations for
+    - all_names (List[str]) ==> the list of names to search for variations
+    - distance_threshold (float) ==> for a name to be identified as a variation, its distance to the input name must be above the threshold specified
+    - store_as_dict (bool) ==> as described above, either return list of variations or a dictionary of the variations mapped to their respective distances
+    '''
+    collection = {}
+    for x in all_names:
+        #print(jaro_winkler_distance(name,x))
+        if(jaro_winkler_distance(name, x) > distance_threshold):
+            collection[x] = distance_threshold
+    if(store_as_dict):
+        return collection
+    else:
+        return collection.keys()
+
 def instantiate_threads(thread_count: int = 4, total_pages: int = 79, target_function = get_firstnames, *args_for_target):
     '''
     Creates threads with as evenly distributed a workload as possible
@@ -228,8 +164,8 @@ class WebScrapeThread(threading.Thread):
 #print(get_firstnames_with_birthyear(get_surname_index_page(22), False, True))
 
 name_dict = {}
-threads = instantiate_threads(4, 79, get_firstnames_with_birthyear, True, True)    # call this function to instantiate dictionary with years as the keys and lists of names as values
-#threads = instantiate_threads(4, 79, get_firstnames, True, True)   # call this function to instantiate dictionary with names as keys and occurrences represented as integers for values
+#threads = instantiate_threads(4, 79, get_firstnames_with_birthyear, True, True)    # call this function to instantiate dictionary with years as the keys and lists of names as values
+threads = instantiate_threads(4, 79, get_firstnames, True, True)   # call this function to instantiate dictionary with names as keys and occurrences represented as integers for values
 
 for thread in threads:
     thread.start()
@@ -242,57 +178,27 @@ dics = []
 for thread in threads:
     dics.append(thread.dic)
 
-complete_dictionary = {}
+data = {}
 
 for i in range(0, len(dics)):
-    complete_dictionary = combine_dicts(complete_dictionary, dics[i])
+    data = combine_dicts(data, dics[i])
 
-#for key, value in complete_dictionary.items():
+#for key, value in data.items():
 #    print(f"{key}: {value}")
 
-data = complete_dictionary
+target_name = "Marie"
+print(target_name)
 
-def merge_years_into_decade(dict_to_recomp: dict):
-    '''
-    For a dictionary where the keys are birth years as integers, this function will merge key-value pairs which sit within the same decade
-    - returns a dictionary where the key is the year and the value is the list of names born in that year
-    '''
-    new_dict = {}
-    for key, value in dict_to_recomp.items():
-        decade = int(key/10) * 10
-        if decade in new_dict:
-            for name in value:
-                new_dict[decade].append(name)
-        else:
-            new_dict[decade] = value
-    return new_dict
+data = list(set(data.keys()))
+print(data)
+variations = find_variations_in_name(target_name, data, 0.6, True)
 
-def recomp_dict(dict_to_recomp: dict):
-    '''
-    input: dictionary where key is a year or decade as int and the value is a list of names
-    returns:
-    - key is the year/decade as a number
-    - the value is another dictionary mapping names from that year to their respective number of occurences ==> same structure as the output from get_firstnames
-    '''
-    new_dict = {}
-    for key, value in dict_to_recomp.items():
-        if key in new_dict:
-            for name in value:
-                if name in new_dict[key]:
-                    new_dict[key] += 1
-                else:
-                    new_dict[key] = 0
-        else:
-            value_dict = {}
-            for name in value:
-                if name in value_dict:
-                    value_dict[name] += 1
-                else:
-                    value_dict[name] = 1
-            new_dict[key] = value_dict
-    return new_dict
 
-data = recomp_dict(merge_years_into_decade(data))
+print(f"Target name: {target_name}")
+for key,value in variations.items():
+    print(f"Name: {name}; Distance: {value}")
+
+#data = recomp_dict(merge_years_into_decade(data))
 
 #for key, value in data.items():
 #    print(key, ": ", value, "\n")
@@ -313,6 +219,8 @@ def format_plot_for_getFirstNamesWithBirthYearAsInt(data: dict, number_of_names_
     = We then need to label on the x-axis: the keys representing decades; the y-axis: number of occurrences for names; and the bars: most common names each decade
 
     STILL NEED TO ADD FUNCTIONALITY TO PLOT A NUMBER OF TOP POPULAR NAMES, I.E. TOP TWO, THREE, FOUR ETC.
+    https://matplotlib.org/3.1.1/gallery/lines_bars_and_markers/barchart.html#sphx-glr-gallery-lines-bars-and-markers-barchart-py
+    USE THIS WEBSITE FOR GUIDANCE
     '''
     # Set default font sizes
     plt.rcParams['font.size'] = 14               # Default font size for all text
@@ -367,8 +275,6 @@ def format_plot_for_getFirstNamesWithBirthYearAsInt(data: dict, number_of_names_
 
     plt.show()
 
-format_plot_for_getFirstNamesWithBirthYearAsInt(data)
-
 def format_plot_for_getFirstNames(data: dict):
     '''
     Call this function if your dictionary was created using the function get_firstnames
@@ -409,3 +315,5 @@ def format_plot_for_getFirstNames(data: dict):
     #plt.grid(True)
 
     plt.show()
+
+#format_plot_for_getFirstNamesWithBirthYearAsInt(data)

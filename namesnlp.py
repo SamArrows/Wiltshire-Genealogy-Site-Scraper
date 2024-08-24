@@ -6,6 +6,15 @@ General outline:
 - search for consonant substitutions such as jacob and jakob where the vowel succeeding c determines whether it sounds like k or s and thus whether the name has variations
 '''
 from typing import List
+import re
+
+def replace_strings(strings_replacements: dict):
+    '''
+    Replace letters with other corresponding letters by feeding in a one-to-one dictionary of strings to strings, specifying what to replace
+    - uses regex to systematically replace each substring key by its corresponding value before moving on to the next key-value substring pair
+    '''
+    return 
+
 
 def stemmatization(x: str, letters_to_strip_from_end: List[str] = [], remove_sequential_duplicates: bool = False):
     '''
@@ -41,6 +50,8 @@ def matching_characters(x: str, y: str):
         ( max(|x|, |y|) / 2 ) - 1   characters where |x| = len(x), |y| = len(y)
     - Example: same and seam have 4 matching characters
     '''
+    x = x.upper()
+    y = y.upper()
     matches = 0
     for i in range(0, len(x)):
         check_next_letter = False
@@ -60,6 +71,8 @@ def length_of_common_prefix(x: str, y: str):
     '''
     - returns the length of the common prefix of two strings
     '''
+    x = x.upper()
+    y = y.upper()
     length = 0
     chars_to_check = min(len(x),len(y))
     terminate = False
@@ -78,6 +91,8 @@ def transpositions(x: str, y: str):
         - Count the number of matching characters that are out of order
         - Divide this count by 2 to get the number of transpositions
     '''
+    x = x.upper()
+    y = y.upper()
     count = 0
     for i in range(0, len(x)):
         check_next_letter = False
@@ -122,11 +137,9 @@ def jaro_winkler_distance(x: str, y: str, winkler_on: bool = True, scaling_facto
         else:
             return jaro
 
-print(stemmatization("marrianna", ['a','e','i','o','u','y'], True))
+#print(stemmatization("marrianna", ['a','e','i','o','u','y'], True))
+#print(jaro_winkler_distance("Marie", "Eerie"))
 
-print(jaro_winkler_distance("jake", "jacob"))
-
-
-
+#print(jaro_winkler_distance(stemmatization("jake",  ['a','e','i','o','u','y'], True), stemmatization("jacob",  ['a','e','i','o','u','y'], True)))
 
 
